@@ -1,95 +1,125 @@
 import os
+import requests
 import json
+import logging
 from dotenv import load_dotenv
-from google import genai
-
 load_dotenv()
+# 🔥 Setup logger (only once per file)
+logger = logging.getLogger(__name__)
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def call_llm(prompt: str):
+    try:
+        logger.info("Calling OpenRouter LLM...")
+
+        response = requests.post(
+            URL,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "meta-llama/llama-3-8b-instruct",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }
+        )
+
+        logger.info(f"LLM Status Code: {response.status_code}")
+        logger.info(f"LLM Response: {response.text}")
+
+        if response.status_code != 200:
+            logger.error(f"LLM Error Response: {response.text}")
+            return ""
+
+        data = response.json()
+
+        output = data["choices"][0]["message"]["content"]
+        logger.info("LLM Response received successfully")
+
+        return output
+
+    except Exception as e:
+        logger.error(f"LLM call failed: {str(e)}")
+        return ""
 
 
 def classify_email(text: str):
-
     prompt = f"""
-Analyze this email and return JSON only.
+    You are an API.
 
-Email:
-{text}
+    Return ONLY valid JSON.
+    Do NOT include any explanation.
 
-Return format:
-{{
-"category": "...",
-"intent": "...",
-"priority": "...",
-"sentiment": "...",
-"confidence": "..."
-}}
-"""
+    {{
+      "category": "...",
+      "intent": "...",
+      "priority": "...",
+      "sentiment": "..."
+    }}
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
+    Email:
+    {text}
+    """
+
+    logger.info("Classifying email...")
+
+    output = call_llm(prompt)
+
+    # 🔥 Clean markdown formatting if present
+    output = output.replace("```json", "").replace("```", "").strip()
 
     try:
-        cleaned = response.text.replace("```json", "").replace("```", "")
-        data = json.loads(cleaned)
+        result = json.loads(output)
+        logger.info("Email classified successfully")
+        return result
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing failed: {str(e)}")
+        logger.error(f"RAW OUTPUT: {output}")
 
         return {
-            "category": data.get("category", "General"),
-            "intent": data.get("intent", "Inquiry"),
-            "priority": data.get("priority", "Low"),
-            "sentiment": data.get("sentiment", "Neutral"),
-            "confidence": data.get("confidence", "Medium")
-        }
-
-    except Exception:
-
-        return {
-            "category": "General",
-            "intent": "Inquiry",
-            "priority": "Low",
-            "sentiment": "Neutral",
-            "confidence": "Medium"
+            "category": "Unknown",
+            "intent": "Unknown",
+            "priority": "Unknown",
+            "sentiment": "Unknown"
         }
 
 
 def generate_response(text: str):
+    logger.info("Generating email response...")
 
     prompt = f"""
-Write a professional email response to the following message.
+    Write a professional email reply for:
 
-Email:
-{text}
-"""
+    {text}
+    """
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt
-    )
-
-    return response.text
+    return call_llm(prompt)
 
 
 def explain_classification(text: str, classification: dict):
+    logger.info("Generating classification explanation...")
 
-    explanation = {
-        "reasoning": "",
-        "key_phrases": [],
-        "confidence": classification.get("confidence", "Medium")
-    }
+    prompt = f"""
+    Explain why this email was classified this way.
 
-    keywords = ["urgent", "issue", "help", "request", "please", "problem"]
+    Email:
+    {text}
 
-    lower = text.lower()
+    Classification:
+    {classification}
 
-    explanation["key_phrases"] = [k for k in keywords if k in lower]
+    Give a short explanation.
+    """
 
-    if classification["priority"] == "High":
-        explanation["reasoning"] = "Urgency indicators detected in email."
-    elif classification["intent"] == "Inquiry":
-        explanation["reasoning"] = "User appears to be asking for information."
-    else:
-        explanation["reasoning"] = "General email communication pattern."
+    return call_llm(prompt)
 
-    return explanation
+
+# 🔥 Debug log instead of print
+logger.info(f"API KEY loaded: {'YES' if OPENROUTER_API_KEY else 'NO'}")
