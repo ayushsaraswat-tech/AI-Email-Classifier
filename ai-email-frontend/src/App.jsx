@@ -6,14 +6,11 @@ const API = "http://127.0.0.1:8001/emails";
 function App() {
   const [emails, setEmails] = useState([]);
   const [filter, setFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
 
   const fetchEmails = async () => {
-    try {
-      const res = await axios.get(`${API}/all`);
-      setEmails(res.data);
-    } catch (err) {
-      console.error(err);
-    }
+    const res = await axios.get(`${API}/all`);
+    setEmails(res.data);
   };
 
   useEffect(() => {
@@ -30,199 +27,157 @@ function App() {
     fetchEmails();
   };
 
-  const getPriorityColor = (priority) => {
-    if (priority === "High") return "#ef4444";
-    if (priority === "Medium") return "#f59e0b";
-    return "#22c55e";
-  };
+  const filteredEmails = emails
+    .filter((e) => (filter === "ALL" ? true : e.status === filter))
+    .filter(
+      (e) =>
+        e.subject.toLowerCase().includes(search.toLowerCase()) ||
+        e.sender.toLowerCase().includes(search.toLowerCase())
+    );
 
-  const getStatusColor = (status) => {
-    if (status === "PENDING") return "#f59e0b";
-    if (status === "APPROVED") return "#22c55e";
-    if (status === "REJECTED") return "#ef4444";
-    return "#3b82f6";
-  };
+  const count = (status) =>
+    emails.filter((e) => e.status === status).length;
 
   return (
-    <div
-      style={{
-        padding: "40px",
-        fontFamily: "Inter, Arial",
-        background: "#0f172a",
-        minHeight: "100vh",
-        color: "white",
-      }}
-    >
-      <h1 style={{ fontSize: "32px", marginBottom: "20px" }}>
-        📬 AI Email Dashboard
-      </h1>
+    <div className="flex h-screen bg-slate-950 text-white">
 
-      {/* Refresh Button */}
-      <button
-        onClick={fetchEmails}
-        style={{
-          marginBottom: "20px",
-          padding: "10px 15px",
-          background: "#3b82f6",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        🔄 Refresh
-      </button>
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-900 p-6 border-r border-slate-800">
+        <h2 className="text-xl font-bold mb-8">📬 AI Mail</h2>
 
-      {/* Filters */}
-      <div style={{ marginBottom: "30px" }}>
-        <button onClick={() => setFilter("ALL")}>All</button>
-        <button onClick={() => setFilter("PENDING")} style={{ marginLeft: "10px" }}>
-          Pending
-        </button>
-        <button onClick={() => setFilter("APPROVED")} style={{ marginLeft: "10px" }}>
-          Approved
-        </button>
-        <button onClick={() => setFilter("REJECTED")} style={{ marginLeft: "10px" }}>
-          Rejected
-        </button>
+        <div className="space-y-2">
+          {["ALL", "PENDING", "APPROVED", "REJECTED"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`w-full text-left px-3 py-2 rounded-lg ${
+                filter === f
+                  ? "bg-blue-600"
+                  : "hover:bg-slate-800"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* CENTER WRAPPER */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        {emails.length === 0 ? (
-          <p>No emails found</p>
-        ) : (
-          emails
-            .filter((email) =>
-              filter === "ALL" ? true : email.status === filter
-            )
-            .map((email) => (
-              <div
-                key={email.id}
-                style={{
-                  background: "#1e293b",
-                  padding: "20px",
-                  marginBottom: "20px",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
-                  width: "100%",
-                  maxWidth: "900px",
-                }}
-              >
-                <h2 style={{ fontSize: "20px" }}>{email.subject}</h2>
-                <p style={{ color: "#94a3b8" }}>From: {email.sender}</p>
+      {/* Main */}
+      <div className="flex-1 p-6 overflow-y-auto">
 
-                {/* Tags */}
-                <div style={{ marginTop: "10px" }}>
-                  <span
-                    style={{
-                      background: getPriorityColor(email.priority),
-                      padding: "5px 10px",
-                      borderRadius: "6px",
-                      marginRight: "10px",
-                      color: "white",
-                    }}
-                  >
-                    {email.priority}
-                  </span>
+        {/* Top Bar */}
+        <div className="flex justify-between items-center mb-6">
+          <input
+            type="text"
+            placeholder="Search emails..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-slate-800 px-4 py-2 rounded-lg w-1/3 outline-none"
+          />
 
-                  <span
-                    style={{
-                      background: getStatusColor(email.status),
-                      padding: "5px 10px",
-                      borderRadius: "6px",
-                      color: "white",
-                    }}
-                  >
-                    {email.status}
-                  </span>
-                </div>
+          <button
+            onClick={fetchEmails}
+            className="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Refresh
+          </button>
+        </div>
 
-                <p style={{ marginTop: "10px" }}>
-                  <b>Category:</b> {email.category}
-                </p>
-                <p>
-                  <b>Intent:</b> {email.intent}
-                </p>
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <p className="text-sm text-gray-400">Total</p>
+            <h2 className="text-xl font-bold">{emails.length}</h2>
+          </div>
 
-                {/* Draft */}
-                <div style={{ marginTop: "15px" }}>
-                  <b>Draft Response:</b>
-                  <pre
-                    style={{
-                      background: "#0f172a",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordWrap: "break-word",
-                      overflowWrap: "break-word",
-                      maxWidth: "100%",
-                      overflowX: "auto",
-                    }}
-                  >
-                    {email.draft_response}
-                  </pre>
-                </div>
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <p className="text-sm text-gray-400">Pending</p>
+            <h2 className="text-xl font-bold text-yellow-400">
+              {count("PENDING")}
+            </h2>
+          </div>
 
-                {/* Buttons */}
-                <div style={{ marginTop: "10px" }}>
-                  <button
-                    onClick={() => approveEmail(email.id)}
-                    style={{
-                      background: "#22c55e",
-                      border: "none",
-                      padding: "8px 12px",
-                      borderRadius: "6px",
-                      color: "white",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Approve
-                  </button>
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <p className="text-sm text-gray-400">Approved</p>
+            <h2 className="text-xl font-bold text-green-400">
+              {count("APPROVED")}
+            </h2>
+          </div>
 
-                  <button
-                    onClick={() => rejectEmail(email.id)}
-                    style={{
-                      background: "#ef4444",
-                      border: "none",
-                      padding: "8px 12px",
-                      borderRadius: "6px",
-                      color: "white",
-                      marginLeft: "10px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
+          <div className="bg-slate-900 p-4 rounded-xl">
+            <p className="text-sm text-gray-400">Rejected</p>
+            <h2 className="text-xl font-bold text-red-400">
+              {count("REJECTED")}
+            </h2>
+          </div>
+        </div>
 
-                {/* AI Explanation */}
-                <div style={{ marginTop: "15px" }}>
-                  <b>AI Explanation:</b>
-                  <pre
-                    style={{
-                      background: "#020617",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      whiteSpace: "pre-wrap",
-                      wordWrap: "break-word",
-                      overflowWrap: "break-word",
-                      maxWidth: "100%",
-                      overflowX: "auto",
-                    }}
-                  >
-                    {email.ai_explanation}
-                  </pre>
-                </div>
+        {/* Emails */}
+        <div className="space-y-4">
+          {filteredEmails.map((email) => (
+            <div
+              key={email.id}
+              className="bg-slate-900 p-5 rounded-xl shadow hover:scale-[1.01] transition"
+            >
+              <h2 className="text-lg font-semibold">
+                {email.subject}
+              </h2>
+              <p className="text-sm text-gray-400">
+                From: {email.sender}
+              </p>
+
+              {/* Tags */}
+              <div className="flex gap-2 mt-2">
+                <span className="bg-red-500 text-xs px-2 py-1 rounded">
+                  {email.priority}
+                </span>
+                <span className="bg-blue-500 text-xs px-2 py-1 rounded">
+                  {email.status}
+                </span>
               </div>
-            ))
-        )}
+
+              <p className="mt-2 text-sm">
+                <b>Category:</b> {email.category}
+              </p>
+              <p className="text-sm">
+                <b>Intent:</b> {email.intent}
+              </p>
+
+              {/* Draft */}
+              <div className="mt-3">
+                <b>Draft Response:</b>
+                <pre className="bg-slate-950 p-3 rounded mt-1 text-sm whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                  {email.draft_response}
+                </pre>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => approveEmail(email.id)}
+                  className="bg-green-500 px-3 py-1 rounded hover:bg-green-600"
+                >
+                  Approve
+                </button>
+
+                <button
+                  onClick={() => rejectEmail(email.id)}
+                  className="bg-red-500 px-3 py-1 rounded hover:bg-red-600"
+                >
+                  Reject
+                </button>
+              </div>
+
+              {/* Explanation */}
+              <div className="mt-3">
+                <b>AI Explanation:</b>
+                <pre className="bg-black p-3 rounded mt-1 text-sm whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                  {email.ai_explanation}
+                </pre>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
