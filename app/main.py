@@ -1,26 +1,18 @@
 from fastapi import FastAPI
-from app.routes import email_routes
-from app.database import engine, Base
-from app.models import email_model
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import Base, engine
+from app.models import email_model, user_model
+
 app = FastAPI(title="AI Email Assistant")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # allow all (dev only)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+# ✅ CREATE TABLES
 Base.metadata.create_all(bind=engine)
 
+# ✅ IMPORT AFTER app creation
+from app.routes import auth_routes
+from app.routes import email_routes
+
+# ✅ INCLUDE ROUTERS
+app.include_router(auth_routes.router)
 app.include_router(email_routes.router)
-
-
-@app.get("/")
-def root():
-    return {"status": "running"}
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}

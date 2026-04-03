@@ -4,7 +4,7 @@ from app.database import Base
 
 class EmailLog(Base):
     __tablename__ = "email_logs"
-
+    user_id = Column(Integer)
     id = Column(Integer, primary_key=True, index=True)
     sender = Column(String)
     subject = Column(String)
@@ -20,3 +20,11 @@ class EmailLog(Base):
     status = Column(String, default="PENDING")
     approver = Column(String, nullable=True)
     ai_explanation = Column(Text, nullable=True)
+
+class UserEmail(Base):
+    __tablename__ = "user_emails"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    email = Column(String)
+    password = Column(String)  # encrypt in production

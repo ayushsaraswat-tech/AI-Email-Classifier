@@ -3,6 +3,7 @@ import requests
 import json
 import logging
 from dotenv import load_dotenv
+
 load_dotenv()
 # 🔥 Setup logger (only once per file)
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ def classify_email(text: str):
         }
 
 
-def generate_response(text: str):
+def generate_response(text: str, user):
     logger.info("Generating email response...")
 
     prompt = f"""
@@ -100,7 +101,19 @@ def generate_response(text: str):
     {text}
     """
 
-    return call_llm(prompt)
+    #  generate base response first
+    draft_response = call_llm(prompt)
+
+    #  add signature
+    signature = ""
+
+    if user.signature_name:
+        signature += f"\n\nBest regards,\n{user.signature_name}"
+
+    if user.company_signature:
+        signature += f"\n{user.company_signature}"
+
+    return draft_response + signature
 
 
 def explain_classification(text: str, classification: dict):
