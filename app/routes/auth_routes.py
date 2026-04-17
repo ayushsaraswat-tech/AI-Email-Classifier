@@ -12,6 +12,9 @@ router = APIRouter(
     prefix="/auth",
     tags=["Auth"]
 )
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -21,43 +24,46 @@ def test():
     return {"message": "AUTH WORKING"}
 
 
-@router.post("/register")
-def register(email: str, password: str):
-    db = SessionLocal()
-
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
-
-    hashed = pwd_context.hash(password)
-
-    user = User(email=email, password=hashed)
-    db.add(user)
-    db.commit()
-
-    return {"message": "User created"}
 
 
 @router.post("/login")
 def login(data: LoginRequest):
     db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == data.email).first()
 
-    user = db.query(User).filter(User.email == data.email).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # 🔥 DEBUG HERE
-    print("RAW PASSWORD:", data.password)
-    print("HASHED:", user.password if user else "NO USER FOUND")
+        if not pwd_context.verify(data.password, user.password):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user:
-        print("VERIFY:", pwd_context.verify(data.password, user.password))
+        token = create_access_token({
+            "sub": user.email,
+            "role": user.role
+        })
 
-    # ❗ ACTUAL CHECK
-    if not user or not pwd_context.verify(data.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        return {"access_token": token}
 
-    token = create_access_token({
-        "sub": user.email,
-        "role": user.role
-    })
+    finally:
+        db.close()
 
-    return {"access_token": token}
+
+@router.post("/register")
+def register(data: RegisterRequest):
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == data.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="User already exists")
+
+        hashed = pwd_context.hash(data.password)
+
+        user = User(email=data.email, password=hashed, role="user")
+        db.add(user)
+        db.commit()
+
+        return {"message": "User created"}
+
+    finally:
+        db.close()

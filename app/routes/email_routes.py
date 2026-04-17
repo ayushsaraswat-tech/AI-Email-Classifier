@@ -77,7 +77,8 @@ def get_pending_emails(user=Depends(get_current_user)):
     try:
         return db.query(EmailLog).filter(
             EmailLog.user_id == user.id,
-            EmailLog.status == "PENDING"
+            EmailLog.status == "PENDING",
+            EmailLog.user_id == user.id
         ).all()
     finally:
         db.close()
@@ -85,11 +86,12 @@ def get_pending_emails(user=Depends(get_current_user)):
 
 # 🔥 APPROVE EMAIL (ADMIN ONLY)
 @router.post("/approve/{email_id}")
-def approve_email(email_id: int, user=Depends(require_admin)):
+def approve_email(email_id: int, user=Depends(get_current_user)):
     db = SessionLocal()
     try:
         email = db.query(EmailLog).filter(
-            EmailLog.id == email_id
+            EmailLog.id ==email_id,
+            EmailLog.user_id == user.id
         ).first()
 
         if not email:
@@ -110,11 +112,11 @@ def approve_email(email_id: int, user=Depends(require_admin)):
 def get_all_emails(
     status: Optional[str] = None,
     priority: Optional[str] = None,
-    user=Depends(require_admin)
+    user=Depends(get_current_user)
 ):
     db = SessionLocal()
     try:
-        query = db.query(EmailLog)
+        query = db.query(EmailLog).filter(EmailLog.user_id == user.id)
 
         if status:
             query = query.filter(EmailLog.status == status)
@@ -129,7 +131,7 @@ def get_all_emails(
 
 # 🔥 REVIEW QUEUE (ADMIN)
 @router.get("/review-queue")
-def review_queue(user=Depends(require_admin)):
+def review_queue(user=Depends(get_current_user)):
     db = SessionLocal()
     try:
         return db.query(EmailLog).filter(

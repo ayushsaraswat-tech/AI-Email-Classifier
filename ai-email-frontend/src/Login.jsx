@@ -6,32 +6,44 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = async () => {
-    try {
-     const res = await api.post("/auth/login", {
-  email,
-  password,
-});
+ const handleLogin = async () => {
+  try {
+    const res = await api.post("/auth/login", {
+      email,
+      password,
+    });
+
+    localStorage.setItem("token", res.data.access_token);
+    onLogin();
+  } catch (err) {
+    setError("Invalid credentials");
+  }
+};
+
 const handleRegister = async () => {
   try {
-    const res = await api.post("/auth/register", {
+    await api.post("/auth/register", {
       email,
       password,
     });
 
     alert("User registered! Now login.");
   } catch (err) {
-    alert("Registration failed");
+    console.error(err);
+
+    if (err.response) {
+      const detail = err.response.data.detail;
+
+      if (Array.isArray(detail)) {
+        alert(detail.map(e => e.msg).join("\n"));
+      } else {
+        alert(detail);
+      }
+    } else {
+      alert("Server error");
+    }
   }
 };
-
-      localStorage.setItem("token", res.data.access_token);
-      onLogin();
-    } catch (err) {
-      setError("Invalid credentials");
-    }
-  };
-
   return (
     <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
       <div className="bg-slate-900 p-6 rounded-xl w-80">
