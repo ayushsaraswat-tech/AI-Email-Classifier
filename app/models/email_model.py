@@ -28,3 +28,8 @@ class UserEmail(Base):
     user_id = Column(Integer)
     email = Column(String)
     password = Column(String)  # encrypt in production
+    auth_type = Column(String, default="imap")
+    access_token = Column(Text, nullable=True)
+    refresh_token = Column(Text, nullable=True)
+    token_uri = Column(String, nullable=True)
+    scopes = Column(Text, nullable=True)

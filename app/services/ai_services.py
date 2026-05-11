@@ -1,16 +1,25 @@
-import os
-import requests
 import json
 import logging
+import os
+
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
-# 🔥 Setup logger (only once per file)
+
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
 URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def _unknown_classification():
+    return {
+        "category": "Unknown",
+        "intent": "Unknown",
+        "priority": "Unknown",
+        "sentiment": "Unknown",
+    }
 
 
 def call_llm(prompt: str):
@@ -26,27 +35,26 @@ def call_llm(prompt: str):
             json={
                 "model": "meta-llama/llama-3-8b-instruct",
                 "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            }
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            timeout=45,
         )
 
-        logger.info(f"LLM Status Code: {response.status_code}")
-        logger.info(f"LLM Response: {response.text}")
+        logger.info("LLM Status Code: %s", response.status_code)
 
         if response.status_code != 200:
-            logger.error(f"LLM Error Response: {response.text}")
+            logger.error("LLM Error Response: %s", response.text)
             return ""
 
         data = response.json()
-
-        output = data["choices"][0]["message"]["content"]
+        output = data["choices"][0]["message"].get("content") or ""
         logger.info("LLM Response received successfully")
 
         return output
 
-    except Exception as e:
-        logger.error(f"LLM call failed: {str(e)}")
+    except Exception as exc:
+        logger.error("LLM call failed: %s", str(exc))
         return ""
 
 
@@ -70,26 +78,27 @@ def classify_email(text: str):
 
     logger.info("Classifying email...")
 
-    output = call_llm(prompt)
-
-    # 🔥 Clean markdown formatting if present
+    output = call_llm(prompt) or ""
     output = output.replace("```json", "").replace("```", "").strip()
+
+    if not output:
+        logger.error("LLM returned an empty classification response")
+        return _unknown_classification()
 
     try:
         result = json.loads(output)
         logger.info("Email classified successfully")
-        return result
-
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing failed: {str(e)}")
-        logger.error(f"RAW OUTPUT: {output}")
-
         return {
-            "category": "Unknown",
-            "intent": "Unknown",
-            "priority": "Unknown",
-            "sentiment": "Unknown"
+            "category": result.get("category") or "Unknown",
+            "intent": result.get("intent") or "Unknown",
+            "priority": result.get("priority") or "Unknown",
+            "sentiment": result.get("sentiment") or "Unknown",
         }
+
+    except json.JSONDecodeError as exc:
+        logger.error("JSON parsing failed: %s", str(exc))
+        logger.error("RAW OUTPUT: %s", output)
+        return _unknown_classification()
 
 
 def generate_response(text: str, user):
@@ -101,10 +110,10 @@ def generate_response(text: str, user):
     {text}
     """
 
-    #  generate base response first
-    draft_response = call_llm(prompt)
+    draft_response = call_llm(prompt) or (
+        "Thank you for your email. I will review this and get back to you shortly."
+    )
 
-    #  add signature
     signature = ""
 
     if user.signature_name:
@@ -131,8 +140,7 @@ def explain_classification(text: str, classification: dict):
     Give a short explanation.
     """
 
-    return call_llm(prompt)
+    return call_llm(prompt) or "The AI service did not return an explanation for this email."
 
 
-# 🔥 Debug log instead of print
-logger.info(f"API KEY loaded: {'YES' if OPENROUTER_API_KEY else 'NO'}")
+logger.info("API KEY loaded: %s", "YES" if OPENROUTER_API_KEY else "NO")

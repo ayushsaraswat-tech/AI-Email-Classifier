@@ -4,6 +4,7 @@ import Login from "./Login";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import EmailCard from "./components/EmailCard";
+import ProfilePanel from "./components/ProfilePanel";
 import Dashboard from "./pages/Dashboard";
 
 function App() {
@@ -11,6 +12,8 @@ function App() {
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fetchEmails = async () => {
     try {
@@ -39,6 +42,31 @@ function App() {
   const rejectEmail = async (id) => {
     await api.post(`/emails/reject/${id}`);
     fetchEmails();
+  };
+
+  const importEmails = async () => {
+    setImporting(true);
+    try {
+      const res = await api.post("/emails/fetch-connected");
+      await fetchEmails();
+      if (res.data.errors?.length) {
+        const details = res.data.errors.map((error) => `${error.email}: ${error.detail}`).join("\n");
+        alert(`Imported ${res.data.imported_count} emails.\n\nSome accounts could not be fetched:\n${details}`);
+      } else {
+        alert(`Imported ${res.data.imported_count} emails.`);
+      }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (detail?.errors) {
+        const details = detail.errors.map((error) => `${error.email}: ${error.detail}`).join("\n");
+        alert(`${detail.message}\n\n${details}`);
+      } else {
+        alert(detail || "Inbox import failed");
+      }
+      setProfileOpen(true);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const logout = () => {
@@ -70,7 +98,12 @@ function App() {
       <Sidebar filter={filter} setFilter={setFilter} logout={logout} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <Topbar setSearch={setSearch} />
+        <Topbar
+          setSearch={setSearch}
+          openProfile={() => setProfileOpen(true)}
+          importEmails={importEmails}
+          importing={importing}
+        />
 
         <main style={{ flex: 1, overflowY: "auto" }}>
           <Dashboard emails={emails} />
@@ -128,6 +161,8 @@ function App() {
           </div>
         </main>
       </div>
+
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }
